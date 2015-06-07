@@ -38,7 +38,6 @@ import datetime
 import functools
 import logging
 import time
-from .parallel import Thread
 
 logger = logging.getLogger('schedule')
 
@@ -126,7 +125,10 @@ class Job(object):
         self.next_run = None  # datetime of the next run
         self.period = None  # timedelta between runs, only valid for
         self.start_day = None  # Specific day of the week to start on
+
         self.canceled = False  # Cancel job for the job running parallelly 
+        self.parallel_running = False
+        self.only_one = False
 
     def __lt__(self, other):
         """PeriodicJobs are sortable based on the scheduled time
@@ -279,8 +281,12 @@ class Job(object):
         self._schedule_next_run()
         return self
 
-    def parallelly(self, parallel=Thread):
+    def parallelly(self, parallel=None, only_one=False):
+        if parallel == None:
+            from .parallel import Thread
+            parallel = Thread
         self.job_func = parallel(self)
+        self.only_one = only_one
         return self
 
     @property
@@ -290,8 +296,11 @@ class Job(object):
 
     def run(self):
         """Run the job and immediately reschedule it."""
-        logger.info('Running job %s', self)
-        ret = self.job_func()
+        if not self.parallel_running or not self.only_one:
+            logger.info('Running job %s', self)
+            ret = self.job_func()
+        else:
+            ret = None
         self.last_run = datetime.datetime.now()
         self._schedule_next_run()
         return ret

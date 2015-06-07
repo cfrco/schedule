@@ -11,9 +11,12 @@ def thread_func(job, job_func):
     if isinstance(ret, CancelJob) or ret is CancelJob:
         job.canceled = True
 
+    job.parallel_running = False
+
 def Thread(job):
     job_func = job.job_func
     def func():
+        job.parallel_running = True
         thread = threading.Thread(target=thread_func, args=(job, job_func))
         thread.start()
     return func
@@ -41,7 +44,10 @@ def Process(job):
         if isinstance(ret, CancelJob) or ret is CancelJob:
             job.canceled = True
 
+        job.parallel_running = False
+
     def func():
+        job.parallel_running = True
         thread = threading.Thread(target=_func)
         thread.start()
 

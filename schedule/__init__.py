@@ -38,6 +38,7 @@ import datetime
 import functools
 import logging
 import time
+from .parallel import Thread
 
 logger = logging.getLogger('schedule')
 
@@ -93,6 +94,10 @@ class Scheduler(object):
         return job
 
     def _run_job(self, job):
+        if job.canceled:
+            self.cancel_job(job)
+            return
+
         ret = job.run()
         if isinstance(ret, CancelJob) or ret is CancelJob:
             self.cancel_job(job)
@@ -121,6 +126,7 @@ class Job(object):
         self.next_run = None  # datetime of the next run
         self.period = None  # timedelta between runs, only valid for
         self.start_day = None  # Specific day of the week to start on
+        self.canceled = False  # Cancel job for the job running parallelly 
 
     def __lt__(self, other):
         """PeriodicJobs are sortable based on the scheduled time
@@ -271,6 +277,10 @@ class Job(object):
         self.job_func = functools.partial(job_func, *args, **kwargs)
         functools.update_wrapper(self.job_func, job_func)
         self._schedule_next_run()
+        return self
+
+    def parallelly(self, parallel=Thread):
+        self.job_func = parallel(self)
         return self
 
     @property

@@ -38,6 +38,7 @@ import datetime
 import functools
 import logging
 import time
+from .counter import Counter
 
 logger = logging.getLogger('schedule')
 
@@ -126,8 +127,8 @@ class Job(object):
         self.period = None  # timedelta between runs, only valid for
         self.start_day = None  # Specific day of the week to start on
 
+        self.running_count = Counter()
         self.canceled = False  # Cancel job for the job running parallelly 
-        self.parallel_running = False
         self.only_one = False
 
     def __lt__(self, other):
@@ -285,6 +286,7 @@ class Job(object):
         if parallel == None:
             from .parallel import Thread
             parallel = Thread
+
         self.job_func = parallel(self)
         self.only_one = only_one
         return self
@@ -296,9 +298,11 @@ class Job(object):
 
     def run(self):
         """Run the job and immediately reschedule it."""
-        if not self.parallel_running or not self.only_one:
+        if not (self.running_count.value > 0 and self.only_one):
             logger.info('Running job %s', self)
+            self.running_count.inc()
             ret = self.job_func()
+            self.running_count.dec()
         else:
             ret = None
         self.last_run = datetime.datetime.now()
